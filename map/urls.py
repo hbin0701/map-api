@@ -15,8 +15,16 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from places import views
+from django.urls import path, register_converter
+
+from . import converters
+
+register_converter(converters.FloatUrlParameterConverter, 'float')
 
 urlpatterns = [
+    path("get/<float:x>/<float:y>", views.process_reviews),
+    path("get/", views.process_reviews),
     path('admin/', admin.site.urls),
     path('users/', include('users.urls')),
 ]
