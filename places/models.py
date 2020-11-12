@@ -21,4 +21,3 @@ class Reviews(models.Model):
     
     class Meta:
         db_table = "Reviews"
-        

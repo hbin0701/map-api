@@ -18,9 +18,14 @@ class ReviewSerializer(serializers.ModelSerializer):
         fields = ['author', 'place', 'comment', 'created_date', 'rating']
 
     def create(self, validated_data):
+        # Place name might not be unique, so use place id.
         place = validated_data.pop('place')
-        place_instance = Places.objects.get(name=place)
+        print("Is this the problem?")
+        place_instance = Places.objects.get(id = place)
+        # Author is always unique, as we prevented same username in registration.
         author = validated_data.pop('author')
         author_instance = Users.objects.get(username=author)
         instance = Reviews.objects.create(place=place_instance, author=author_instance, **validated_data)
-        return instance   
+        return instance 
+
+     
