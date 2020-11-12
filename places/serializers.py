@@ -6,11 +6,12 @@ from users.serializers import UserSerializer
 class PlaceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Places
+        depth = 1
         fields = ['latitude', 'longtitude', 'name', 'rating']
 
 class ReviewSerializer(serializers.ModelSerializer):
-    author = serializers.CharField()
-    place = serializers.CharField()
+    author = UserSerializer()
+    place = PlaceSerializer()
 
     class Meta:
         model = Reviews
