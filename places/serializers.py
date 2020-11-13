@@ -9,18 +9,31 @@ class PlaceSerializer(serializers.ModelSerializer):
         depth = 1
         fields = ['latitude', 'longtitude', 'name', 'rating']
 
+
+class RecommendedPlaceSerializer(serializers.ModelSerializer):
+    distance = serializers.SerializerMethodField()
+
+    def get_distance(self, obj):
+        # return in km.
+        return round(float(obj.calc_distance) * 111111 / 1000, 2)
+
+    class Meta:
+        model = Places
+        depth = 1
+        fields = ['latitude', 'longtitude', 'name', 'rating', 'distance']
+
+
 class ReviewSerializer(serializers.ModelSerializer):
     author = UserSerializer()
     place = PlaceSerializer()
 
     class Meta:
         model = Reviews
-        fields = ['author', 'place', 'comment', 'created_date', 'rating']
+        fields = ['id', 'author', 'place', 'comment', 'created_date', 'rating']
 
     def create(self, validated_data):
         # Place name might not be unique, so use place id.
         place = validated_data.pop('place')
-        print("Is this the problem?")
         place_instance = Places.objects.get(id = place)
         # Author is always unique, as we prevented same username in registration.
         author = validated_data.pop('author')
