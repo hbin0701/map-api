@@ -23,6 +23,29 @@ class RecommendedPlaceSerializer(serializers.ModelSerializer):
         fields = ['latitude', 'longtitude', 'name', 'rating', 'distance']
 
 
+class PlaceInfoSerializer(serializers.ModelSerializer):
+    reviews_count = serializers.SerializerMethodField()
+    temp_rating = serializers.SerializerMethodField()
+
+    def get_reviews_count(self, obj):
+        if obj.reviews_count == None:
+            return 0
+        return obj.reviews_count
+    
+    def temp_rating(self, obj):
+        if obj.temp_rating == None:
+            return 0
+        return obj.temp_rating
+
+    class Meta:
+        model = Places
+        depth = 1
+        fields = ['latitude', 'longtitude', 'name', 'reviews_count','temp_rating']
+
+
+
+
+
 class ReviewSerializer(serializers.ModelSerializer):
     author = UserSerializer()
     place = PlaceSerializer()

@@ -5,10 +5,13 @@ from django.views import View
 from django.http import JsonResponse    
 from .models import Places, Reviews
 from users.models import Users
-from .serializers import PlaceSerializer, ReviewSerializer, RecommendedPlaceSerializer
+from .serializers import PlaceSerializer, ReviewSerializer, RecommendedPlaceSerializer, PlaceInfoSerializer
 from django.db.models import Count, Avg, F, Func, Q
 
 def get_nearby_places(request):
+    '''
+    returns 5 nearby_places with higest rating.
+    '''
  if request.method == 'POST':
         # need to post latitude, longtitude, name, and size (optional)
         data = JSONParser().parse(request)
@@ -20,11 +23,11 @@ def get_nearby_places(request):
 
         # Get places that are nearby in distance of 0.5, 1, 3 km accordingly.
         # assume 111 km = 1 degrees.
-        if size = "small":
+        if size == "small":
             distance = 0.5
-        elif size = "middle":
+        elif size == "middle":
             distance = 1
-        elif size = "big":
+        elif size == "big":
             distance = 3
 
         distance = round(distance/111, 6)
@@ -65,6 +68,8 @@ def edit_reviews(request):
 
 def place_info(request):
     if request.method == 'POST':
+        # Returns all the infos for place, like:
+        # latitude, longtitude, name, reviews_count, rating, and the most recent three reviews.
         # need latitude , longtitude , place
         data = JSONParser().parse(request)
 
@@ -76,22 +81,35 @@ def place_info(request):
             'rating': 0 
         })
         
-        b = Places.objects.filter(latitude=data['latitude']).filter(longtitude=data['longtitude']).filter(name=data['place']).annotate(reviews_count = Count('reviewset')).annotate(temp_rating=Avg('reviewset__rating'))
+        temp = Places.objects.filter(latitude=data['latitude']).filter(longtitude=data['longtitude']).filter(name=data['place'])\
+            .annotate(reviews_count = Count('reviewset')).annotate(temp_rating=Avg('reviewset__rating'))
+        
 
         if created:
             target.rating = 0
         else:
-            target.rating = list(b.values_list('temp_rating', flat=True))[0]
+            target.rating = list(temp.values_list('temp_rating', flat=True))[0]
 
         target.save()
-        nearby_places = get_nearby_places(request)    
 
+        serializer = PlaceInfoSerializer(temp, many=True)
+        place_id = list(Places.objects.filter(latitude=data['latitude']).filter(longtitude=data['longtitude']).filter(name=data['place'])\
+            .values_list("id", flat=True))[0]
+        
+        reviewset = Reviews.objects.filter(place_id=place_id).order_by('-created_date')[:3]
+        reviewset = ReviewSerializer(reviewset, many=True)
 
-    # Get the review for the place.
-    pass
+        context = {
+            'place_info': serializer.data
+            'reviews': reviewset.data
+        }
+
+        data = json.dumps(context, indent=4, sort_keys=True, default=str)
+        return JsonResponse(data, safe=False)
 
 def process_reviews(request, x=0, y=0):
     if request.method == 'GET': 
+        # Gets all the Reviews for a place. This is for when user clicked "More Reviews."
         place_id = list(Places.objects.filter(longtitude=x).filter(latitude=y).values("id"))[0]['id']
         reviewset = Reviews.objects.filter(place_id=place_id)
         serializer = ReviewSerializer(reviewset, many=True)
