@@ -32,7 +32,7 @@ class PlaceInfoSerializer(serializers.ModelSerializer):
             return 0
         return obj.reviews_count
     
-    def temp_rating(self, obj):
+    def get_temp_rating(self, obj):
         if obj.temp_rating == None:
             return 0
         return obj.temp_rating

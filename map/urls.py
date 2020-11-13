@@ -23,10 +23,12 @@ from . import converters
 register_converter(converters.FloatUrlParameterConverter, 'float')
 
 urlpatterns = [
-    path("get/<float:x>/<float:y>", views.process_reviews),
-    path("get/", views.process_reviews),
+    path("placeinfo/", views.place_info),
+    path("nearby/", views.get_nearby_places),
+    path("process_reviews/<float:x>/<float:y>", views.process_reviews),
+    path("process_reviews/", views.process_reviews),
     path("remove/", views.remove_reviews),
-    path("edit/", views.remove_reviews),
+    path("edit/", views.edit_reviews),
     path("my_reviews/", views.get_my_reviews),
     path('admin/', admin.site.urls),
     path('users/', include('users.urls')),

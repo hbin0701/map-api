@@ -2,19 +2,31 @@ import json
 from rest_framework.parsers import JSONParser
 from django.core import serializers
 from django.views import View
-from django.http import JsonResponse    
+from django.http import JsonResponse, HttpResponse 
 from .models import Places, Reviews
 from users.models import Users
 from .serializers import PlaceSerializer, ReviewSerializer, RecommendedPlaceSerializer, PlaceInfoSerializer
 from django.db.models import Count, Avg, F, Func, Q
+from django.utils.safestring import mark_safe
 
 def get_nearby_places(request):
     '''
     returns 5 nearby_places with higest rating.
     '''
- if request.method == 'POST':
-        # need to post latitude, longtitude, name, and size (optional)
+    if request.method == 'POST':
+        # need to post latitude, longtitude, place, and size (optional)
         data = JSONParser().parse(request)
+
+        # If place doesn't exist, register it first·
+        a, created = Places.objects.get_or_create(
+            latitude = data['latitude'],
+            longtitude = data['longtitude'],
+            defaults = {
+                'name': data['place'],
+                'rating': 0 
+            }
+        )
+
         try:
             size = data['size']
         except:
@@ -34,7 +46,7 @@ def get_nearby_places(request):
 
         result = Places.objects.annotate(calc_distance=Func((F('latitude')- data['latitude'])** 2 + \
             (F('longtitude') - data['longtitude']) ** 2, function='SQRT')).filter(Q(~Q(calc_distance=0)\
-                |~Q(name=data['name']))).filter(calc_distance__lt=distance).order_by('-rating')[:5]
+                |~Q(name=data['place']))).filter(calc_distance__lt=distance).order_by('-rating')[:5]
         
         serializer = RecommendedPlaceSerializer(result, many=True)
         return JsonResponse(serializer.data, safe=False)
@@ -48,8 +60,15 @@ def get_my_reviews(request):
         serializer = ReviewSerializer(reviewset, many=True)
         return JsonResponse(serializer.data, safe=False)
 
+
+'''
+remove_reviews and edit_reviews will be only accessible through my_reviews page
+where each review will be returned with its unique id.
+'''
+
 def remove_reviews(request):
     # Delete my reviews
+    # Need id of the review.
     if request.method == 'POST':
         data = JSONParser().parse(request)
         review = Reviews.objects.get(id=data['id'])
@@ -59,18 +78,20 @@ def remove_reviews(request):
 
 def edit_reviews(request):     
     # Edit my reivews.
+    # Need id of the review, new_rating, new_comment
     if request.method == 'POST':
-        review.rating = request.POST['rating']
-        review.comment = request.POST['comment']
+        data = JSONParser().parse(request)
+        review = Reviews.objects.get(id=data['id'])
+        review.rating = data['rating']
+        review.comment = data['comment']
         review.save()
         return JsonResponse({"message": "Review succesfully edited."}, status=201)
 
-
 def place_info(request):
     if request.method == 'POST':
+        # needs latitude , longtitude , place
         # Returns all the infos for place, like:
         # latitude, longtitude, name, reviews_count, rating, and the most recent three reviews.
-        # need latitude , longtitude , place
         data = JSONParser().parse(request)
 
         target, created = Places.objects.get_or_create(
@@ -84,32 +105,30 @@ def place_info(request):
         temp = Places.objects.filter(latitude=data['latitude']).filter(longtitude=data['longtitude']).filter(name=data['place'])\
             .annotate(reviews_count = Count('reviewset')).annotate(temp_rating=Avg('reviewset__rating'))
         
-
-        if created:
-            target.rating = 0
-        else:
+        num = list(temp.values_list('temp_rating', flat=True))[0]
+        
+        if num != None:
             target.rating = list(temp.values_list('temp_rating', flat=True))[0]
-
-        target.save()
+            target.save()
 
         serializer = PlaceInfoSerializer(temp, many=True)
         place_id = list(Places.objects.filter(latitude=data['latitude']).filter(longtitude=data['longtitude']).filter(name=data['place'])\
             .values_list("id", flat=True))[0]
-        
+
         reviewset = Reviews.objects.filter(place_id=place_id).order_by('-created_date')[:3]
         reviewset = ReviewSerializer(reviewset, many=True)
 
         context = {
-            'place_info': serializer.data
+            'place_info': serializer.data,
             'reviews': reviewset.data
         }
 
-        data = json.dumps(context, indent=4, sort_keys=True, default=str)
-        return JsonResponse(data, safe=False)
+        data = mark_safe(json.dumps(context, indent=4, sort_keys=True, default=str))
+        return HttpResponse(data, content_type='application/json')
 
 def process_reviews(request, x=0, y=0):
+    # Gets all the Reviews for a place. This is for when user clicked "More Reviews."
     if request.method == 'GET': 
-        # Gets all the Reviews for a place. This is for when user clicked "More Reviews."
         place_id = list(Places.objects.filter(longtitude=x).filter(latitude=y).values("id"))[0]['id']
         reviewset = Reviews.objects.filter(place_id=place_id)
         serializer = ReviewSerializer(reviewset, many=True)
